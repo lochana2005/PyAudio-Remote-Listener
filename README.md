@@ -5,6 +5,8 @@
 # 🎙️ Remote Mic Streamer & Dashboard
 
 A powerful **Python-based remote audio streaming system** that allows you to capture microphone input from a client machine and stream it in real-time to a central Dashboard. This project includes a GUI for the server and a payload builder to create standalone executables for clients.
+![licensed-image](https://github.com/user-attachments/assets/34341707-8713-4992-935d-4a52ba8a23c7)
+
 
 ## ✨ Key Features
 
