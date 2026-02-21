@@ -77,7 +77,7 @@ This project is created for **educational purposes** and **authorized monitoring
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page]([https://www.google.com/search?q=https://github.com/your-username/your-repo-name/issues](https://github.com/lochana2005/PyAudio-Remote-Listener/issues)).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/lochana2005/PyAudio-Remote-Listener/issue).
 
 ---
 
