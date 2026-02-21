@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout
                              QScrollArea, QFrame, QHBoxLayout, QLineEdit, QMessageBox, QCheckBox)
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
 
-# --- Configuration Management ---
+
 CONFIG_FILE = "settings.json"
 
 def save_settings(ip, port, auto_rec):
@@ -219,7 +219,7 @@ class MainSystem(QMainWindow):
         
         def run_build():
             try:
-                # 1. Original audio_sender.py kiyawanna
+                
                 if not os.path.exists("audio_sender.py"):
                     self.signals.update_build_log.emit("❌ Error: audio_sender.py not found!")
                     self.signals.build_done.emit("err")
@@ -228,7 +228,7 @@ class MainSystem(QMainWindow):
                 with open("audio_sender.py", "r", encoding="utf-8") as f:
                     lines = f.readlines()
 
-                # 2. IP saha Port dashboard eken ena values walin update karanna
+                
                 new_lines = []
                 for line in lines:
                     if line.strip().startswith("SERVER_IP ="):
@@ -238,13 +238,12 @@ class MainSystem(QMainWindow):
                     else:
                         new_lines.append(line)
 
-                # 3. Temporary payload file ekak hadanna
+                
                 temp_filename = "temp_payload_build.py"
                 with open(temp_filename, "w", encoding="utf-8") as f:
                     f.writelines(new_lines)
 
-                # 4. PyInstaller use karala EXE eka hadanna
-                # python -m use karala PATH issue eka bypass karanawa
+              
                 subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconsole", "--onefile", "--name=audio_sender_payload", temp_filename])
                 
                 self.signals.build_done.emit("ok")
